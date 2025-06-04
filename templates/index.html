@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Recomendador de Películas</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <h1>Películas recomendadas</h1>
+    <a href="{{ url_for('registro') }}" class="btn">Registrarse</a>
+    <a href="{{ url_for('login') }}" class="btn">Iniciar sesión</a>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <ul class="flashes">
+        {% for category, message in messages %}
+          <li class="{{ category }}">{{ message }}</li>
+        {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+    <div>
+        <strong>Filtrar por género:</strong>
+        {% for genero in generos %}
+            <a href="/?genero={{ genero }}" class="btn {% if seleccionado == genero %}seleccionado{% endif %}">{{ genero }}</a>
+        {% endfor %}
+        <a href="/" class="btn">Todos</a>
+    </div>
+    <hr>
+    <div class="peliculas">
+        {% if peliculas %}
+            {% for peli in peliculas %}
+                <div class="pelicula">
+                    <h2>{{ peli.titulo }}</h2>
+                    <p><strong>Género:</strong> {{ peli.genero }}</p>
+                    <p><strong>Puntuación:</strong> {{ peli.puntuacion }}</p>
+                    <form action="/marcar_vista/{{ peli.id }}" method="post" style="display:inline;">
+                        <label>Valorar: <input type="number" name="valoracion" min="1" max="10" step="0.1" required></label>
+                        <button type="submit">Marcar como vista</button>
+                    </form>
+                    <a href="/pelicula/{{ peli.id }}" class="btn">Más info</a>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p>No hay más películas para recomendar. ¡Has visto todas!</p>
+        {% endif %}
+    </div>
+</body>
+</html>
