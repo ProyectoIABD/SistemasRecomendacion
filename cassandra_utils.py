@@ -12,14 +12,14 @@ CASSANDRA_PASS = 'cassandra'      # Cambia por tu contraseña si tienes autentic
 # Si tu clúster no requiere autenticación, puedes omitir auth_provider
 # auth_provider = PlainTextAuthProvider(username=CASSANDRA_USER, password=CASSANDRA_PASS)
 # cluster = Cluster(CASSANDRA_HOSTS, auth_provider=auth_provider)
-cluster = Cluster(CASSANDRA_HOSTS)
-session = cluster.connect()
+#cluster = Cluster(CASSANDRA_HOSTS)
+#session = cluster.connect()
 
 cloud_config = {
-    'secure_connect_bundle': '../cassandra/secure-connect-test-cassandra.zip'
+    'secure_connect_bundle': 'cassandra/secure-connect-test-cassandra.zip'
 }
 
-with open("../cassandra/cassandra-token.json") as f:
+with open("cassandra/cassandra-token.json") as f:
     secrets = json.load(f)
 
 CLIENT_ID = secrets["clientId"]
@@ -36,25 +36,6 @@ def crear_keyspace():
     """)
     session.set_keyspace(CASSANDRA_KEYSPACE)
 
-# Crear tabla de ejemplo para usuarios
-def crear_tabla_usuarios():
-    session.execute(f"""
-        CREATE TABLE IF NOT EXISTS usuarios (
-            numero text PRIMARY KEY,
-            contrasena text
-        )
-    """)
-
-# Crear tabla para registros de vistas
-def crear_tabla_vistos():
-    session.execute(f"""
-        CREATE TABLE IF NOT EXISTS vistos (
-            numero text,
-            pelicula_id int,
-            rating float,
-            PRIMARY KEY (numero, pelicula_id)
-        )
-    """)
 
 # Insertar usuario
 def insertar_usuario(numero, contrasena):
@@ -72,10 +53,7 @@ def buscar_usuario(numero):
 
 # Guardar registro de vista
 def guardar_visto(numero, pelicula_id, rating):
-    session.execute(
-        "INSERT INTO vistos (numero, pelicula_id, rating) VALUES (%s, %s, %s)",
-        (numero, pelicula_id, rating)
-    )
+    return
 
 # Obtener registros de vistas de un usuario
 def obtener_vistos_usuario(numero):
@@ -85,6 +63,4 @@ def obtener_vistos_usuario(numero):
     return list(result)
 
 # Inicialización
-crear_keyspace()
-crear_tabla_usuarios()
-crear_tabla_vistos()
+#crear_keyspace()
