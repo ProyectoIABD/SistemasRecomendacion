@@ -1,2 +1,3 @@
 flask
 cassandra-driver
+kafka-python

@@ -2,8 +2,32 @@ from flask import Flask, render_template, request, redirect, url_for, abort, jso
 from mongo_utils import insertar_usuario, buscar_usuario, verificar_contrasena
 from cassandra_utils import guardar_visto
 
+from kafka import KafkaProducer
+from kafka.errors import NoBrokersAvailable
+import time
+
 app = Flask(__name__)
 app.secret_key = 'supersecretkey'  # Necesario para usar sesiones
+
+# KAFKA
+KAFKA_BROKER = 'kafka:9092'
+KAFKA_TOPIC = 'info'
+
+producer = None
+timeout = 300  # 5 minutos en segundos
+start_time = time.time()
+
+while producer is None:
+    try:
+        producer = KafkaProducer(bootstrap_servers=KAFKA_BROKER)
+        print("Conectado a Kafka exitosamente.")
+    except NoBrokersAvailable:
+        elapsed_time = time.time() - start_time
+        if elapsed_time > timeout:
+            print("Error: Kafka no está disponible después de 5 minutos. Abortando.")
+            raise Exception("Kafka no está disponible después de 5 minutos.")
+        print("Kafka no está disponible. Reintentando en 5 segundos...")
+        time.sleep(5)
 
 # Datos de ejemplo: películas
 peliculas = [
@@ -78,6 +102,25 @@ def marcar_vista(id):
             except Exception as e:
                 flash(f"Error al guardar en Cassandra: {e}", 'error')
     return redirect(url_for('index'))
+
+
+@app.route('/info/<int:id>', methods=['POST'])
+def info(id):
+    peli = next((p for p in peliculas if p['id'] == id), None)
+    if peli:
+        numero = session.get('usuario_numero')
+        if numero:
+            try:
+                producer.send(KAFKA_TOPIC, value=str(id).encode('utf-8'))
+                flash(f"Has buscado más info para '{peli['titulo']}'", 'success')
+            except Exception as e:
+                flash(f"Error al enviar a Kafka: {e}", 'error')
+        else:
+            flash("No hay número de usuario en sesión", 'warning')
+    else:
+        flash("Película no encontrada", 'error')
+
+    return redirect(url_for('pelicula', id=id))
 
 @app.route('/registro', methods=['GET', 'POST'])
 def registro():
