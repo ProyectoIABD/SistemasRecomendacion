@@ -22,7 +22,7 @@ def get_generos():
     return sorted(list(set(p['genero'] for p in peliculas)))
 
 # 1. Ruta básica
-@app.route('/')
+@app.route("/")
 def index():
     if not session.get('logged_in'):
         return redirect(url_for('registro'))
@@ -130,4 +130,4 @@ def pagina_no_encontrada(error):
     return render_template('error.html', error=error), 404
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)
