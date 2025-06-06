@@ -1,3 +1,5 @@
 flask
 cassandra-driver
 kafka-python
+pymongo
+pandas

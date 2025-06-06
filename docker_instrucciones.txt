@@ -1,0 +1,6 @@
+Crear imagen server web: docker build -t server_proyecto .
+Crear docker con kafka/zookeeker/server: docker compose up
+
+
+server web: http://localhost:5000
+server kafka (ver topic messages): http://localhost:8080

@@ -1,17 +1,26 @@
-FROM python:3.9
+FROM python:3.9-slim
 
-# Establecer el directorio de trabajo en /app
+# Establecer el directorio de trabajo
 WORKDIR /app
 
-COPY requirements.txt .
-# Instalar dependencias necesarias
-RUN pip install -r requirements.txt
+# Archivos Python
+COPY app.py /app/
+COPY mongo_utils.py /app/
+COPY cassandra_utils.py /app/
+COPY requirements.txt /app/
 
-# Copiar los archivos de la aplicación al contenedor
-COPY . .
+# Archivos WEB
+COPY static /app/static
+COPY templates /app/templates
 
-# Exponer el puerto en el que la aplicación escuchará
+# Cassandra
+COPY cassandra /app/cassandra
+
+# Instalar las dependencias
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Exponer el puerto 5000
 EXPOSE 5000
 
-# Comando por defecto al iniciar el contenedor
+# Comando para ejecutar la aplicación
 CMD ["python", "app.py"]
