@@ -19,7 +19,7 @@ usuarios_col = db[COLLECTION]
 def insertar_usuario(numero, contrasena):
     # Guarda la contraseña hasheada por seguridad
     usuario = {
-        'numero': numero,
+        'numero': str(numero),
         'contrasena': generate_password_hash(contrasena)
     }
     usuarios_col.insert_one(usuario)
