@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, abort, jsonify, session, flash
 from mongo_utils import insertar_usuario, buscar_usuario, verificar_contrasena
 from cassandra_utils import guardar_visto
+import os
 
 from kafka import KafkaProducer
 from kafka.errors import NoBrokersAvailable
@@ -10,7 +11,8 @@ app = Flask(__name__)
 app.secret_key = 'supersecretkey'  # Necesario para usar sesiones
 
 # KAFKA
-KAFKA_BROKER = 'kafka:9092'
+# KAFKA_BROKER = 'kafka:9092'
+KAFKA_BROKER = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
 KAFKA_TOPIC = 'info'
 
 producer = None
@@ -63,27 +65,11 @@ def detalle_pelicula(id):
     peli = next((p for p in peliculas if p['id'] == id), None)
     if not peli:
         abort(404)
+    mas_info_kafka(id)
     # Recomendaciones: mismas género y buena puntuación, que no estén vistas
     pelis_no_vistas = get_peliculas_no_vistas()
     recomendaciones = [p for p in pelis_no_vistas if p['genero'] == peli['genero'] and p['id'] != id and p['puntuacion'] >= 7.5]
     return render_template('detalle.html', pelicula=peli, recomendaciones=recomendaciones)
-
-# 3. Manejo de formularios (GET/POST)
-@app.route('/formulario', methods=['GET', 'POST'])
-def mostrar_formulario():
-    if request.method == 'POST':
-        nombre = request.form['nombre']
-        email = request.form['email']
-        # Aquí normalmente procesaríamos los datos
-        return redirect(url_for('resultado', nombre=nombre, email=email))
-    return render_template('formulario.html')
-
-# 4. Redirección y resultado
-@app.route('/resultado')
-def resultado():
-    nombre = request.args.get('nombre', 'Invitado')
-    email = request.args.get('email', '')
-    return render_template('resultado.html', nombre=nombre, email=email)
 
 @app.route('/marcar_vista/<int:id>', methods=['POST'])
 def marcar_vista(id):
@@ -103,15 +89,13 @@ def marcar_vista(id):
                 flash(f"Error al guardar en Cassandra: {e}", 'error')
     return redirect(url_for('index'))
 
-
-@app.route('/info/<int:id>', methods=['POST'])
-def info(id):
+def mas_info_kafka(id):
     peli = next((p for p in peliculas if p['id'] == id), None)
     if peli:
         numero = session.get('usuario_numero')
         if numero:
             try:
-                producer.send(KAFKA_TOPIC, value=str(id).encode('utf-8'))
+                producer.send(KAFKA_TOPIC, value=str(f'ID: {id} / Pelicula: {peli["titulo"]}').encode('utf-8'))
                 flash(f"Has buscado más info para '{peli['titulo']}'", 'success')
             except Exception as e:
                 flash(f"Error al enviar a Kafka: {e}", 'error')
@@ -120,7 +104,23 @@ def info(id):
     else:
         flash("Película no encontrada", 'error')
 
-    return redirect(url_for('pelicula', id=id))
+# 3. Manejo de formularios (GET/POST)
+@app.route('/formulario', methods=['GET', 'POST'])
+def mostrar_formulario():
+    if request.method == 'POST':
+        nombre = request.form['nombre']
+        email = request.form['email']
+        # Aquí normalmente procesaríamos los datos
+        return redirect(url_for('resultado', nombre=nombre, email=email))
+    return render_template('formulario.html')
+
+# 4. Redirección y resultado
+@app.route('/resultado')
+def resultado():
+    nombre = request.args.get('nombre', 'Invitado')
+    email = request.args.get('email', '')
+    return render_template('resultado.html', nombre=nombre, email=email)
+
 
 @app.route('/registro', methods=['GET', 'POST'])
 def registro():
@@ -159,7 +159,7 @@ def login():
         contrasena = request.form['contrasena']
         usuario = buscar_usuario(numero)
         if usuario and verificar_contrasena(usuario, contrasena):
-            session['usuario_numero'] = numero
+            session['usuario_numero'] = str(numero)
             session['logged_in'] = True
             flash('¡Bienvenido de nuevo!', 'success')
             return redirect(url_for('index'))
