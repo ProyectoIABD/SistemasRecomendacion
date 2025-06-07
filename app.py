@@ -7,16 +7,32 @@ import time
 from kafka import KafkaProducer
 from kafka.errors import NoBrokersAvailable
 
+import pandas as pd
+from sklearn.metrics.pairwise import cosine_similarity
+
 from mongo_utils import (
-    insertar_usuario, buscar_usuario, verificar_contrasena,
+    buscar_usuario, verificar_contrasena,
     get_peliculas, get_peliculas_vistas, anhadir_pelicula_vista
 )
 
+from cassandra_utils import (get_cassandra_predictions)
+
+import random
+
+import joblib
+import numpy as np
 
 # ─── CONFIGURACIÓN GENERAL ─────────────────────────────────────────────────────
 
 app = Flask(__name__)
 app.secret_key = 'supersecretkey'  # Necesaria para sesiones
+
+df_movies = pd.read_csv('./Data/transformed/movies_cleaned.csv')
+
+# ─── CARGAR MODELOS ────────────────────────────────────────────────────────────
+
+pca = joblib.load('./notebooks/modelos_entrenados/pca_model.pkl')
+similarity_matrix = np.load('./notebooks/modelos_entrenados/similarity_matrix.npy')
 
 # ─── CONFIGURACIÓN DE KAFKA ────────────────────────────────────────────────────
 
@@ -43,6 +59,7 @@ peliculas = get_peliculas()
 
 def get_peliculas_no_vistas():
     numero = session.get('usuario_numero')
+    predicciones = get_cassandra_predictions(userId=int(numero))
     vistas = get_peliculas_vistas(userId=numero)
 
     movie_ids_vistos = set()
@@ -52,7 +69,17 @@ def get_peliculas_no_vistas():
         elif isinstance(vistas[0], (int, str)):
             movie_ids_vistos = {str(p) for p in vistas}
 
-    return [p for p in peliculas if str(p['movieId']) not in movie_ids_vistos]
+    # Filtrar predicciones no vistas
+    pred_no_vistas = [p for p in predicciones if str(p.movieid) not in movie_ids_vistos]
+
+    # Seleccionar 5 random (o menos si no hay suficientes)
+    seleccion = random.sample(pred_no_vistas, min(5, len(pred_no_vistas)))
+
+    # Si quieres devolver los objetos de 'peliculas' correspondientes, puedes hacer:
+    movie_ids_seleccion = {str(p.movieid) for p in seleccion}
+    peliculas_seleccionadas = [p for p in peliculas if str(p['movieId']) in movie_ids_seleccion]
+
+    return peliculas_seleccionadas
 
 
 def get_generos():
@@ -62,20 +89,35 @@ def get_generos():
 # ─── FUNCIONES AUXILIARES ──────────────────────────────────────────────────────
 
 def mas_info_kafka(movie_id):
-    peli = next((p for p in peliculas if p['id'] == movie_id), None)
+    peli = next((p for p in peliculas if p['movieId'] == movie_id), None)
     if peli:
         numero = session.get('usuario_numero')
         if numero:
             try:
-                mensaje = f"ID: {movie_id} / Película: {peli['titulo']}"
+                mensaje = f"ID: {movie_id} / Película: {peli['title']}"
                 producer.send(KAFKA_TOPIC, value=mensaje.encode('utf-8'))
-                flash(f"🔍 Más info para '{peli['titulo']}' enviada a Kafka", 'success')
+                flash(f"🔍 Más info para '{peli['title']}' enviada a Kafka", 'success')
             except Exception as e:
                 flash(f"Kafka error: {e}", 'error')
         else:
             flash("⚠️ Usuario no logueado", 'warning')
     else:
         flash("Película no encontrada", 'error')
+
+def recommend_movies(movie_id, df, similarity_matrix, top_n=20):
+    try:
+        idx = df[df['movieId'] == movie_id].index[0]
+    except IndexError:
+        return []
+
+    sim_scores = list(enumerate(similarity_matrix[idx]))
+    sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)[1:top_n+1]
+    recommended_indices = [i[0] for i in sim_scores]
+    return df.loc[recommended_indices]
+
+def mas_info_mostrar_recomendaciones(movie_id):
+    recomendaciones = recommend_movies(movie_id, df_movies, similarity_matrix).sample(n=5, random_state=None)
+    return recomendaciones.to_dict(orient='records')
 
 # ─── RUTAS ─────────────────────────────────────────────────────────────────────
 
@@ -98,22 +140,20 @@ def index():
 
 @app.route('/pelicula/<int:id>')
 def detalle_pelicula(id):
-    peli = next((p for p in peliculas if p['id'] == id), None)
+    peli = next((p for p in peliculas if p['movieId'] == str(id)), None)
     if not peli:
         abort(404)
-
+    
+    peliculas_similares = mas_info_mostrar_recomendaciones(id)
     mas_info_kafka(id)
 
     pelis_no_vistas = get_peliculas_no_vistas()
-    recomendaciones = [
-        p for p in pelis_no_vistas
-        if p['genero'] == peli['genero'] and p['id'] != id and p['puntuacion'] >= 7.5
-    ]
+    
 
     return render_template(
         'detalle.html',
         pelicula=peli,
-        recomendaciones=recomendaciones
+        recomendaciones=peliculas_similares
     )
 
 

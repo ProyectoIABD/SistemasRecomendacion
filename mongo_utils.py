@@ -15,15 +15,6 @@ db = client[DB_NAME]
 usuarios_col = db[COLLECTION]
 peliculas_col = db[COLLECTION_peliculas]
 
-def insertar_usuario(numero, contrasena):
-    # Guarda la contraseña hasheada por seguridad
-    usuario = {
-        'numero': str(numero),
-        'contrasena': generate_password_hash(contrasena)
-    }
-    usuarios_col.insert_one(usuario)
-    return usuario
-
 def buscar_usuario(numero):
     return usuarios_col.find_one({'numero': numero})
 
@@ -36,7 +27,7 @@ def get_peliculas():
     return list(peliculas_col.find())
 
 def get_peliculas_vistas(userId):
-    return usuarios_col.find_one({'numero': userId}).get('peliculas', [])
+    return buscar_usuario(userId).get('peliculas', [])
 
 def anhadir_pelicula_vista(userId, movieId, rating):
     try:
