@@ -7,7 +7,6 @@
 </head>
 <body>
     <h1>Películas recomendadas</h1>
-    <a href="{{ url_for('registro') }}" class="btn">Registrarse</a>
     <a href="{{ url_for('login') }}" class="btn">Iniciar sesión</a>
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
@@ -30,14 +29,14 @@
         {% if peliculas %}
             {% for peli in peliculas %}
                 <div class="pelicula">
-                    <h2>{{ peli.titulo }}</h2>
-                    <p><strong>Género:</strong> {{ peli.genero }}</p>
-                    <p><strong>Puntuación:</strong> {{ peli.puntuacion }}</p>
-                    <form action="/marcar_vista/{{ peli.id }}" method="post" style="display:inline;">
+                    <h2>{{ peli.title }} -> ( {{ peli.movieId }} )</h2>
+                    <p><strong>Género:</strong> {{ peli.generos }}</p>
+                    <!-- <p><strong>Puntuación:</strong> {{ peli.puntuacion }}</p> -->
+                    <form action="/marcar_vista/{{ peli.movieId }}" method="post" style="display:inline;">
                         <label>Valorar: <input type="number" name="valoracion" min="1" max="10" step="0.1" required></label>
                         <button type="submit">Marcar como vista</button>
                     </form>
-                    <a href="/pelicula/{{ peli.id }}" class="btn">Más info (KAFKA)</a>
+                    <a href="/pelicula/{{ peli.movieId }}" class="btn">Más info (KAFKA)</a>
                 </div>
             {% endfor %}
         {% else %}

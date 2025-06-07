@@ -51,9 +51,6 @@ def buscar_usuario(numero):
     )
     return result.one()
 
-# Guardar registro de vista
-def guardar_visto(numero, pelicula_id, rating):
-    return
 
 # Obtener registros de vistas de un usuario
 def obtener_vistos_usuario(numero):
@@ -61,6 +58,13 @@ def obtener_vistos_usuario(numero):
         "SELECT pelicula_id, rating FROM vistos WHERE numero=%s", (numero,)
     )
     return list(result)
+
+
+def get_cassandra_predictions(userId):
+    result = session.execute(
+        "SELECT * FROM recomendaciones_ALS WHERE userId=%s", (userId,)
+    )
+    return list(sorted(result, key=lambda r: r.prediction, reverse=True)[:20])
 
 # Inicialización
 #crear_keyspace()
